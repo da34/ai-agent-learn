@@ -1,6 +1,5 @@
-
-const apiKey = "";
-const apiBaseUrl = "https://api.302ai.cn";
+const apiKey = process.env.LLM_API_KEY ?? "";
+const apiBaseUrl = process.env.LLM_API_BASE_URL ?? "https://api.302ai.cn";
 
 const myHeaders = new Headers();
 myHeaders.append("Accept", "application/json");

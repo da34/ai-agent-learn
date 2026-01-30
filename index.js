@@ -1,6 +1,7 @@
+import "dotenv/config";
 import { llm } from "./llm.js";
 import { context } from "./context.js";
-import { getToolSchemas, executeTool } from "./tools";
+import { getToolSchemas, executeTool } from "./tools/index.js";
 import readline from "node:readline";
 import process from "node:process";
 
@@ -66,7 +67,7 @@ async function handleInput(content) {
 	pending = true;
 	try {
 		const data = await chat(content);
-		console.log(data.choices[0].message.content, 33333333);
+		console.log(data.choices[0].message.content);
 	} catch (error) {
 		console.error("请求失败：", error?.message ?? error);
 	} finally {
@@ -75,4 +76,3 @@ async function handleInput(content) {
 		rl.prompt();
 	}
 }
-

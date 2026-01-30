@@ -1,37 +1,25 @@
+import { fsToolSchemas, readFile, writeFile } from "./fs.js";
+import { weatherToolSchemas, getCurrentWeather } from "./weather.js";
+
+const toolHandlers = {
+	getCurrentWeather,
+	readFile,
+	writeFile,
+};
+
 export function getToolSchemas() {
-	return [
-		{
-			type: "function",
-			function: {
-				name: "getCurrentWeather",
-				description: "获取指定地点的当前天气情况",
-				parameters: {
-					type: "object",
-					properties: {
-						location: {
-							type: "string",
-							description: "城市获取地方名字",
-						},
-					},
-					required: ["location"],
-				},
-			},
-		},
-	];
+	return [...weatherToolSchemas, ...fsToolSchemas];
 }
 
-function getCurrentWeather({ location }) {
-	return `${location} 天气 非常不错！`;
-}
-
-export function executeTool(name, args) {
-	let payload;
+export async function executeTool(name, args) {
+	let payload = {};
 	try {
-		payload = JSON.parse(args);
+		payload = args ? JSON.parse(args) : {};
 	} catch (error) {
 		return `工具参数解析失败：${error?.message ?? error}`;
 	}
 
-	if (name === "getCurrentWeather") return getCurrentWeather(payload);
-	return `未知工具：${name}`;
+	const handler = toolHandlers[name];
+	if (!handler) return `未知工具：${name}`;
+	return await handler(payload);
 }
