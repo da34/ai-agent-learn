@@ -1,16 +1,23 @@
 import { fsToolSchemas, readFile, writeFile } from "./fs.js";
 import { weatherToolSchemas, getCurrentWeather } from "./weather.js";
 import { commandToolSchemas, executeCommand } from "./command.js";
+import { searchToolSchemas, searchCode } from "./search.js";
 
 const toolHandlers = {
 	getCurrentWeather,
 	readFile,
 	writeFile,
 	executeCommand,
+	searchCode,
 };
 
 export function getToolSchemas() {
-	return [...weatherToolSchemas, ...fsToolSchemas, ...commandToolSchemas];
+	return [
+		...weatherToolSchemas,
+		...fsToolSchemas,
+		...commandToolSchemas,
+		...searchToolSchemas,
+	];
 }
 
 export async function executeTool(name, args) {
