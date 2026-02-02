@@ -36,10 +36,47 @@ export async function createSessionCache(messages) {
 	const createdAt = new Date().toISOString();
 	const payload = buildPayload(messages, createdAt);
 	await fs.writeFile(cacheFilePath, JSON.stringify(payload, null, 2), "utf-8");
-	return { cacheFilePath, createdAt };
+	return { cacheFilePath, createdAt, id: fileName };
 }
 
 export async function writeSessionCache(cacheFilePath, createdAt, messages) {
 	const payload = buildPayload(messages, createdAt);
 	await fs.writeFile(cacheFilePath, JSON.stringify(payload, null, 2), "utf-8");
+}
+
+export async function listSessionCaches() {
+	await fs.mkdir(cacheDir, { recursive: true });
+	const entries = await fs.readdir(cacheDir, { withFileTypes: true });
+	const files = entries
+		.filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+		.map((entry) => entry.name);
+	const sessions = [];
+	for (const fileName of files) {
+		const filePath = path.join(cacheDir, fileName);
+		try {
+			const content = await fs.readFile(filePath, "utf-8");
+			const payload = JSON.parse(content);
+			sessions.push({
+				id: fileName,
+				filePath,
+				createdAt: payload?.createdAt ?? null,
+				updatedAt: payload?.updatedAt ?? null,
+				messageCount: Array.isArray(payload?.messages)
+					? payload.messages.length
+					: 0,
+			});
+		} catch {
+			continue;
+		}
+	}
+	sessions.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+	return sessions;
+}
+
+export async function readSessionCache(id) {
+	await fs.mkdir(cacheDir, { recursive: true });
+	const filePath = path.join(cacheDir, id);
+	const content = await fs.readFile(filePath, "utf-8");
+	const payload = JSON.parse(content);
+	return { filePath, payload };
 }

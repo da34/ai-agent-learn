@@ -1,7 +1,17 @@
 import "dotenv/config";
 import { llm } from "./llm.js";
-import { context, setPersistMessages } from "./context.js";
-import { createSessionCache, writeSessionCache } from "./session-cache.js";
+import {
+	context,
+	setPersistMessages,
+	getDefaultMessages,
+	resetMessages,
+} from "./context.js";
+import {
+	createSessionCache,
+	writeSessionCache,
+	listSessionCaches,
+	readSessionCache,
+} from "./session-cache.js";
 import { getToolSchemas, executeTool } from "./tools/index.js";
 import readline from "node:readline";
 import process from "node:process";
@@ -12,6 +22,16 @@ const rl = readline.createInterface({
 	output: process.stdout,
 });
 
+const COMMANDS = [
+	{ name: "help", description: "查看支持的命令" },
+	{ name: "list", description: "列出所有会话" },
+	{ name: "new", description: "新建会话" },
+	{ name: "resume <id>", description: "加载指定会话" },
+	{ name: "exit", description: "退出程序" },
+];
+
+const SESSION_COMMANDS = new Set(["list", "new", "resume"]);
+
 let pending = false;
 
 let writeQueue = Promise.resolve();
@@ -19,24 +39,37 @@ try {
 	const { cacheFilePath, createdAt } = await createSessionCache(
 		context.getMessages()
 	);
-	setPersistMessages((messages) => {
-		writeQueue = writeQueue
-			.then(() => writeSessionCache(cacheFilePath, createdAt, messages))
-			.catch((error) => {
-				console.error("缓存写入失败：", error?.message ?? error);
-			});
-	});
+	configureSessionPersistence(cacheFilePath, createdAt);
 } catch (error) {
 	console.error("缓存初始化失败：", error?.message ?? error);
 }
 
 rl.setPrompt("> ");
+printWelcome();
 rl.prompt();
 
 rl.on("line", (line) => {
 	const content = line.trim();
+	if (!content) {
+		rl.prompt();
+		return;
+	}
+	const [command, ...args] = content.split(/\s+/);
 	if (content === "exit") {
 		rl.close();
+		return;
+	}
+	if (content === "help") {
+		printHelp();
+		rl.prompt();
+		return;
+	}
+	if (SESSION_COMMANDS.has(command)) {
+		if (pending) {
+			rl.prompt();
+			return;
+		}
+		void handleCommand(command, args);
 		return;
 	}
 	if (pending) {
@@ -49,6 +82,108 @@ rl.on("line", (line) => {
 rl.on("close", () => {
 	console.log("已退出");
 });
+
+function printWelcome() {
+	console.log("欢迎使用 Learn Agent。");
+	console.log("输入问题开始对话，输入 help 查看当前支持的命令。");
+	printHelp();
+}
+
+function printHelp() {
+	console.log("当前支持的命令：");
+	for (const command of COMMANDS) {
+		console.log(`- ${command.name}：${command.description}`);
+	}
+}
+
+function configureSessionPersistence(cacheFilePath, createdAt) {
+	setPersistMessages((messages) => {
+		writeQueue = writeQueue
+			.then(() => writeSessionCache(cacheFilePath, createdAt, messages))
+			.catch((error) => {
+				console.error("缓存写入失败：", error?.message ?? error);
+			});
+	});
+}
+
+async function handleCommand(command, args) {
+	rl.pause();
+	pending = true;
+	try {
+		switch (command) {
+			case "list":
+				await handleListSessions();
+				break;
+			case "new":
+				await handleNewSession();
+				break;
+			case "resume":
+				await handleResumeSession(args);
+				break;
+			default:
+				break;
+		}
+	} catch (error) {
+		console.error("请求失败：", error?.message ?? error);
+	} finally {
+		pending = false;
+		rl.prompt();
+	}
+}
+
+async function handleListSessions() {
+	const sessions = await listSessionCaches();
+	if (!sessions.length) {
+		console.log("暂无会话。");
+		return;
+	}
+	console.log("会话列表：");
+	for (const session of sessions) {
+		const updatedAt = session.updatedAt ? `，更新时间：${session.updatedAt}` : "";
+		const messageCount = `，消息数：${session.messageCount}`;
+		console.log(`- ${session.id}${updatedAt}${messageCount}`);
+	}
+}
+
+async function handleNewSession() {
+	const defaultMessages = getDefaultMessages();
+	const { cacheFilePath, createdAt, id } = await createSessionCache(
+		defaultMessages
+	);
+	configureSessionPersistence(cacheFilePath, createdAt);
+	resetMessages(defaultMessages);
+	console.log(`已创建新会话：${id}`);
+}
+
+async function handleResumeSession(args) {
+	const id = args[0];
+	if (!id) {
+		console.log("用法：resume <id>");
+		return;
+	}
+	const { filePath, payload } = await readSessionCache(id);
+	const nextMessages = Array.isArray(payload?.messages)
+		? payload.messages
+		: getDefaultMessages();
+	const createdAt = payload?.createdAt ?? new Date().toISOString();
+	resetMessages(nextMessages);
+	configureSessionPersistence(filePath, createdAt);
+	console.log(`已加载会话：${id}`);
+	printSessionHistory(nextMessages);
+}
+
+function printSessionHistory(messages) {
+	if (!messages.length) {
+		console.log("历史记录为空。");
+		return;
+	}
+	console.log("历史记录：");
+	for (const message of messages) {
+		const role = message?.role ?? "unknown";
+		const content = message?.content ?? "";
+		console.log(`[${role}] ${content}`);
+	}
+}
 
 async function chat(userMessage) {
 	context.addUserMessage(userMessage);
