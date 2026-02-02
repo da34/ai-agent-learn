@@ -2,6 +2,12 @@ import { fsToolSchemas, readFile, writeFile } from "./fs.js";
 import { weatherToolSchemas, getCurrentWeather } from "./weather.js";
 import { commandToolSchemas, executeCommand } from "./command.js";
 import { searchToolSchemas, searchCode } from "./search.js";
+import {
+	planToolSchemas,
+	createPlan,
+	updatePlanStep,
+	getPlan,
+} from "./plan.js";
 
 const toolHandlers = {
 	getCurrentWeather,
@@ -9,6 +15,9 @@ const toolHandlers = {
 	writeFile,
 	executeCommand,
 	searchCode,
+	createPlan,
+	updatePlanStep,
+	getPlan,
 };
 
 export function getToolSchemas() {
@@ -17,6 +26,7 @@ export function getToolSchemas() {
 		...fsToolSchemas,
 		...commandToolSchemas,
 		...searchToolSchemas,
+		...planToolSchemas,
 	];
 }
 
