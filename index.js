@@ -96,6 +96,62 @@ function printHelp() {
 	}
 }
 
+function printProgressStart() {
+	console.log("正在处理…");
+}
+
+function printProgressEnd() {
+	console.log("处理完成。");
+}
+
+function formatToolCall(call) {
+	const name = call?.function?.name ?? "unknown";
+	const args = call?.function?.arguments ?? "";
+	return `${name}(${args})`;
+}
+
+function parseToolArgs(call) {
+	const raw = call?.function?.arguments;
+	if (!raw || typeof raw !== "string") return null;
+	try {
+		return JSON.parse(raw);
+	} catch {
+		return null;
+	}
+}
+
+function printToolStart() {
+	console.log("AI 正在使用工具...");
+}
+
+function printToolCall(call) {
+	console.log(`调用：${formatToolCall(call)}`);
+}
+
+function printToolResult(result) {
+	console.log(`结果：${result}`);
+}
+
+function getPlanStepIndex(call) {
+	if (call?.function?.name !== "updatePlanStep") return null;
+	const args = parseToolArgs(call);
+	const index = Number.isFinite(args?.index) ? Math.floor(args.index) : null;
+	return index && index > 0 ? index : null;
+}
+
+function printToolStepStart(call) {
+	const stepIndex = getPlanStepIndex(call);
+	if (!stepIndex) return;
+	console.log(`现在开始第 ${stepIndex} 步：调用 ${formatToolCall(call)}`);
+}
+
+function printToolStepEnd(call) {
+	const stepIndex = getPlanStepIndex(call);
+	if (!stepIndex) return;
+	const name = call?.function?.name ?? "unknown";
+	console.log(`已完成第 ${stepIndex} 步：${name}`);
+}
+
 function configureSessionPersistence(cacheFilePath, createdAt) {
 	setPersistMessages((messages) => {
 		writeQueue = writeQueue
@@ -203,10 +259,17 @@ async function chat(userMessage) {
 		if (response.choices && response.choices[0].finish_reason === "tool_calls") {
 			// console.log(response.choices[0].message.tool_calls)
 			// console.log(response.choices[0].delta.tool_calls)
+			printProgressStart();
 			for (const call of response.choices[0].message.tool_calls) {
+				printToolStart();
+				printToolStepStart(call);
+				printToolCall(call);
 				const result = await executeTool(call.function.name, call.function.arguments);
 				context.addToolResult(call.id, result);
+				printToolResult(result);
+				printToolStepEnd(call);
 			}
+			printProgressEnd();
 			continue; // 继续循环，让 AI 看到工具结果
 		}
 		return response;

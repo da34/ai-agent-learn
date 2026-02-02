@@ -14,7 +14,8 @@ export const llm = {
 // 聊天
 async function chat(config) {
 	const raw = JSON.stringify({
-		model: "gpt-5-nano",
+		// model: "gpt-5-nano",
+		model: "deepseek-v3.2",
 		...config,
 	});
 	
