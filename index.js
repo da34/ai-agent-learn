@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { llm } from "./llm.js";
-import { context } from "./context.js";
+import { context, setPersistMessages } from "./context.js";
+import { createSessionCache, writeSessionCache } from "./session-cache.js";
 import { getToolSchemas, executeTool } from "./tools/index.js";
 import readline from "node:readline";
 import process from "node:process";
@@ -12,6 +13,22 @@ const rl = readline.createInterface({
 });
 
 let pending = false;
+
+let writeQueue = Promise.resolve();
+try {
+	const { cacheFilePath, createdAt } = await createSessionCache(
+		context.getMessages()
+	);
+	setPersistMessages((messages) => {
+		writeQueue = writeQueue
+			.then(() => writeSessionCache(cacheFilePath, createdAt, messages))
+			.catch((error) => {
+				console.error("缓存写入失败：", error?.message ?? error);
+			});
+	});
+} catch (error) {
+	console.error("缓存初始化失败：", error?.message ?? error);
+}
 
 rl.setPrompt("> ");
 rl.prompt();

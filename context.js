@@ -5,10 +5,24 @@ const messages = [
 	},
 ];
 
+let persistMessages = null;
+
+export function setPersistMessages(handler) {
+	persistMessages = handler;
+}
+
 export const context = {
 	getMessages: () => messages,
-	addUserMessage: (message) => messages.push({ role: "user", content: message }),
-	addAiMessage: (message) => messages.push(message),
-	addToolResult: (id, message) =>
-		messages.push({ role: "tool", tool_call_id: id, content: message }),
+	addUserMessage: (message) => {
+		messages.push({ role: "user", content: message });
+		queueMicrotask(() => persistMessages?.(messages));
+	},
+	addAiMessage: (message) => {
+		messages.push(message);
+		queueMicrotask(() => persistMessages?.(messages));
+	},
+	addToolResult: (id, message) => {
+		messages.push({ role: "tool", tool_call_id: id, content: message });
+		queueMicrotask(() => persistMessages?.(messages));
+	},
 };
